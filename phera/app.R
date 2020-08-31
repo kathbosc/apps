@@ -5,54 +5,73 @@ library(viridisLite)
 
 ui <- fluidPage(
   h1("roGFP2 responds curves from phera data"),
-  fileInput(inputId = "phera_data", 
-                label = "Phera data: choose CSV File", 
-                accept = ".csv"),
-  fileInput(inputId = "layout", 
-                label = "plate layout: choose CSV File", 
-                accept = ".csv"),
-  
-  # #ratio or OxD
-  # selectInput(inputId = "y_axis",
-  #             label = "Plot roGFP2 ratio or OxD?", 
-  #             choices = c("OxD" = "OxD", "ratio" = "ratio"),
-  #             selected = NULL,
-  #             multiple = FALSE,
-  #             selectize = TRUE),
-  
-  #plot_title
-  textInput(inputId = "plot_title", 
-                label = "Plot title OxD", 
-                placeholder = "My wonderful phera data", 
-                value = "My wonderful phera data showing roGFP2 ratios"),
-  
-  textInput(inputId = "plot_title", 
-            label = "Plot title ratio", 
-            placeholder = "My wonderful phera data", 
-            value = "My wonderful phera data showing roGFP2 OxD values"),
-  
-  #change y-axis values: 
-  sliderInput(inputId = "y_min_ratio",
-              label = "y-axis min (ratio)",
-              value = 0, min = 0, max = 50),
-  sliderInput(inputId = "y_max_ratio",
-              label = "y-axis max (ratio)",
-              value = 20, min = 0, max = 100),
-  
-  sliderInput(inputId = "y_min_oxd",
-              label = "y-axis min (OxD)",
-              value = 0, min = -3, max = 3),
-  sliderInput(inputId = "y_max_oxd",
-              label = "y-axis max (ratio)",
-              value = 1, min = -3, max = 3),
-  
-  #change time to be displayed
-  sliderInput(inputId = "time_max",
-              label = "time max [min]",
-              value = 140, min = 1, max = 500),
-  
-  plotOutput("plot_ratio"),
-  plotOutput("plot_oxd")
+  hr(),
+  p(strong("File formats:")),
+  p(em("Phera data:"), "Export .csv file from MARS (ASCII). MARS settings for file export: Tick \"add header\" and \"transpose table\". "),
+  p(em("Layout:"), "Save layout (table format) as a .csv file. File needs to include the following columns:"), 
+  p(tags$div
+    (tags$ul
+      (tags$li("well (A1 to H12"))),
+    (tags$ul
+     (tags$li("strain (what protein is tagged with roGFP2?)"))),
+    (tags$ul
+     (tags$li("background (wt/deletion/BY/W ?etc.)"))),
+    (tags$ul
+     (tags$li("treatment"))),
+    (tags$ul
+     (tags$li("max (indicate max_ox eg. diamide / high H2O2, and max_red eg. DTT treated samples")))
+    ),
+  hr(),
+  sidebarLayout(
+    sidebarPanel(fileInput(inputId = "phera_data", 
+                            label = "Phera data: choose CSV File", 
+                            accept = ".csv"),
+                  fileInput(inputId = "layout", 
+                            label = "Plate layout: choose CSV File", 
+                            accept = ".csv"),
+                  
+                  # #ratio or OxD
+                  # selectInput(inputId = "y_axis",
+                  #             label = "Plot roGFP2 ratio or OxD?", 
+                  #             choices = c("OxD" = "OxD", "ratio" = "ratio"),
+                  #             selected = NULL,
+                  #             multiple = FALSE,
+                  #             selectize = TRUE),
+                  
+                  #plot_title
+                  textInput(inputId = "plot_title_ratio", 
+                            label = "Plot title ratio", 
+                            placeholder = "My wonderful phera data", 
+                            value = "My wonderful phera data"),
+                  
+                  textInput(inputId = "plot_title_oxd", 
+                            label = "Plot title OxD", 
+                            placeholder = "My wonderful phera data", 
+                            value = "My wonderful phera data"),
+                  
+                  #change y-axis values: 
+                  numericInput(inputId = "y_min_ratio",
+                              label = "y-axis min (ratio)",
+                              value = 0, min = 0, max = 50),
+                  numericInput(inputId = "y_max_ratio",
+                              label = "y-axis max (ratio)",
+                              value = 20, min = 0, max = 100),
+                  
+                  numericInput(inputId = "y_min_oxd",
+                              label = "y-axis min (OxD)",
+                              value = 0, min = -3, max = 3),
+                  numericInput(inputId = "y_max_oxd",
+                              label = "y-axis max (OxD)",
+                              value = 1, min = -3, max = 3),
+                  
+                  #change time to be displayed
+                  sliderInput(inputId = "time_max",
+                              label = "time max [min]",
+                              value = 140, min = 1, max = 500),
+      ),
+  mainPanel( plotOutput("plot_ratio"),
+             plotOutput("plot_oxd"))
+    )
 )
 
 
@@ -124,7 +143,7 @@ server <- function(input, output) {
       facet_wrap(vars(strain, background))+
       coord_cartesian(ylim = c(input$y_min_ratio, input$y_max_ratio), xlim = c(0, input$time_max))+
       scale_color_viridis_d()+
-      labs(title = input$plot_title)+
+      labs(title = input$plot_title_ratio)+
       xlab("time [min]")+
       ylab("roGFP2 ratio")+
       theme_bw()
@@ -179,7 +198,7 @@ server <- function(input, output) {
       ungroup()
     
     max_redox <- df_bc %>%
-      dplyr::filter(treatment %in% c("DTT", "diamide")) %>%
+      dplyr::filter(max %in% c("max_ox", "max_red")) %>%
       group_by(strain, background, treatment) %>%
       summarise(max(bc400), max(bc485))%>%
       pivot_wider(names_from = treatment, values_from = c("max(bc400)", "max(bc485)"))
@@ -198,7 +217,7 @@ server <- function(input, output) {
       facet_wrap(vars(strain, background))+
       coord_cartesian(ylim = c(input$y_min_oxd, input$y_max_oxd), xlim = c(0, input$time_max))+
       scale_color_viridis_d()+
-      labs(title = input$plot_title)+
+      labs(title = input$plot_title_oxd)+
       xlab("time [min]")+
       ylab("roGFP2 OxD")+
       theme_bw()
