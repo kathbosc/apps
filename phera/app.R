@@ -2,25 +2,31 @@ library(shiny)
 library(tidyverse)
 library(viridis)
 library(viridisLite)
+library(here)
 
 ui <- fluidPage(
   h1("roGFP2 responds curves from phera data"),
   hr(),
   p(strong("File formats:")),
-  p(em("Phera data:"), "Export .csv file from MARS (ASCII). MARS settings for file export: Tick \"add header\" and \"transpose table\". "),
+  p(em("Phera data:"), "Export blank corrected values as a .csv file from MARS (ASCII). MARS settings for file export: Tick \"add header\" and \"transpose table\". "),
+  #downloadButton("downloadData2", "Download example: data"),
+  p(" "),
   p(em("Layout:"), "Save layout (table format) as a .csv file. File needs to include the following columns:"), 
   p(tags$div
     (tags$ul
-      (tags$li("well (A1 to H12"))),
+      (tags$li("well (A1 to H12)"))),
     (tags$ul
-     (tags$li("strain (what protein is tagged with roGFP2?)"))),
+     (tags$li("probe (protein tagged to roGFP)"))),
     (tags$ul
-     (tags$li("background (wt/deletion/BY/W ?etc.)"))),
+     (tags$li("background (wt/deletion/BY/W303 etc.)"))),
     (tags$ul
      (tags$li("treatment"))),
     (tags$ul
-     (tags$li("max (indicate max_ox eg. diamide / high H2O2, and max_red eg. DTT treated samples")))
+     (tags$li("max (indicate max_ox eg. diamide / high H2O2, and max_red eg. DTT treated samples)")))
     ),
+  
+  # downloadButton("downloadData", "Download example: layout"),
+  p(" "),
   hr(),
   sidebarLayout(
     sidebarPanel(fileInput(inputId = "phera_data", 
@@ -76,6 +82,31 @@ ui <- fluidPage(
 
 
 server <- function(input, output) {
+  
+  # # Sample layout
+  # sample_layout <- read.csv(here("phera/sample_layout.csv"),stringsAsFactors = FALSE, encoding = 'UTF-8')
+  # 
+  # output$downloadData <- downloadHandler(
+  #   filename = function() {
+  #     paste("sample_layout", ".csv", sep="")
+  #   },
+  #   content = function(file) {
+  #     write.csv(sample_layout, file)
+  #   }
+  # )
+  # 
+  # # Sample data
+  # sample_data <- read.csv(here("phera/sample_data.csv"),stringsAsFactors = FALSE, encoding = 'UTF-8')
+  # 
+  # output$downloadData2 <- downloadHandler(
+  #   filename = function() {
+  #     paste("sample_data", ".csv", sep="")
+  #   },
+  #   content = function(file) {
+  #     write.csv(sample_data, file)
+  #   }
+  # )
+  
   output$plot_ratio <- renderPlot({
   #phera_data
     phera_data <- input$phera_data
@@ -125,14 +156,14 @@ server <- function(input, output) {
     
     max_redox <- df_bc %>%
       dplyr::filter(treatment %in% c("DTT", "diamide")) %>%
-      group_by(strain, background, treatment) %>%
+      group_by(probe, background, treatment) %>%
       summarise(max(bc400), max(bc485))%>%
       pivot_wider(names_from = treatment, values_from = c("max(bc400)", "max(bc485)"))
     
-    colnames(max_redox) <- c("strain", "background", "max_red_bc400", "max_ox_bc400", "max_red_bc485", "max_ox_bc485")
+    colnames(max_redox) <- c("probe", "background", "max_red_bc400", "max_ox_bc400", "max_red_bc485", "max_ox_bc485")
     
     df_bc <- df_bc %>%
-      left_join(max_redox, by = c("strain", "background")) %>%
+      left_join(max_redox, by = c("probe", "background")) %>%
       mutate(OxD = (bc400 * max_red_bc485 - max_red_bc400 * bc485) / (bc400 * max_red_bc485 - bc400 * max_ox_bc485 + max_ox_bc400 * bc485 - max_red_bc400 * bc485))
     
 
@@ -140,7 +171,7 @@ server <- function(input, output) {
     df_bc %>%
       ggplot(aes(x = time, y = ratio))+
       geom_point(aes(colour = treatment), size = 0.4)+
-      facet_wrap(vars(strain, background))+
+      facet_wrap(vars(probe, background))+
       coord_cartesian(ylim = c(input$y_min_ratio, input$y_max_ratio), xlim = c(0, input$time_max))+
       scale_color_viridis_d()+
       labs(title = input$plot_title_ratio)+
@@ -199,14 +230,14 @@ server <- function(input, output) {
     
     max_redox <- df_bc %>%
       dplyr::filter(max %in% c("max_ox", "max_red")) %>%
-      group_by(strain, background, treatment) %>%
+      group_by(probe, background, treatment) %>%
       summarise(max(bc400), max(bc485))%>%
       pivot_wider(names_from = treatment, values_from = c("max(bc400)", "max(bc485)"))
     
-    colnames(max_redox) <- c("strain", "background", "max_red_bc400", "max_ox_bc400", "max_red_bc485", "max_ox_bc485")
+    colnames(max_redox) <- c("probe", "background", "max_red_bc400", "max_ox_bc400", "max_red_bc485", "max_ox_bc485")
     
     df_bc <- df_bc %>%
-      left_join(max_redox, by = c("strain", "background")) %>%
+      left_join(max_redox, by = c("probe", "background")) %>%
       mutate(OxD = (bc400 * max_red_bc485 - max_red_bc400 * bc485) / (bc400 * max_red_bc485 - bc400 * max_ox_bc485 + max_ox_bc400 * bc485 - max_red_bc400 * bc485))
     
     
@@ -214,7 +245,7 @@ server <- function(input, output) {
     df_bc %>%
       ggplot(aes(x = time, y = OxD))+
       geom_point(aes(colour = treatment), size = 0.4)+
-      facet_wrap(vars(strain, background))+
+      facet_wrap(vars(probe, background))+
       coord_cartesian(ylim = c(input$y_min_oxd, input$y_max_oxd), xlim = c(0, input$time_max))+
       scale_color_viridis_d()+
       labs(title = input$plot_title_oxd)+
